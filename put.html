@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f4f7fb">
+    <title>Cập nhật bình luận</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, "Segoe UI", Arial, sans-serif;
+        color: #172033;
+        background: #f4f7fb;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 320px;
+        min-height: 100vh;
+        margin: 0;
+        padding: 48px 20px;
+      }
+
+      main {
+        width: min(100%, 640px);
+        margin: 0 auto;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: #5369d8;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.8rem, 5vw, 2.4rem);
+        letter-spacing: -0.04em;
+      }
+
+      .subtitle {
+        margin: 9px 0 24px;
+        color: #65708a;
+        line-height: 1.6;
+      }
+
+      form {
+        display: grid;
+        gap: 18px;
+        padding: 24px;
+        border: 1px solid #e5eaf2;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 5px 18px rgb(28 42 75 / 5%);
+      }
+
+      label {
+        display: grid;
+        gap: 8px;
+        color: #34405a;
+        font-size: 0.92rem;
+        font-weight: 650;
+      }
+
+      input,
+      select,
+      textarea {
+        width: 100%;
+        padding: 11px 12px;
+        border: 1px solid #cbd3e1;
+        border-radius: 9px;
+        background: #fff;
+        color: #172033;
+        font: inherit;
+        font-weight: 400;
+      }
+
+      textarea {
+        min-height: 120px;
+        resize: vertical;
+      }
+
+      input:focus,
+      select:focus,
+      textarea:focus {
+        border-color: #5369d8;
+        outline: 3px solid rgb(83 105 216 / 16%);
+      }
+
+      .actions {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+      }
+
+      button {
+        padding: 11px 17px;
+        border: 0;
+        border-radius: 10px;
+        background: #5369d8;
+        color: #fff;
+        font: inherit;
+        font-weight: 650;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #4055c2;
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
+
+      .back-link {
+        color: #4055c2;
+        font-weight: 600;
+        text-decoration: none;
+      }
+
+      #status {
+        min-height: 24px;
+        margin: 16px 0 0;
+        color: #65708a;
+      }
+
+      #status.error {
+        color: #b42318;
+      }
+
+      #status.success {
+        color: #18794e;
+      }
+
+      @media (max-width: 520px) {
+        body {
+          padding: 32px 16px;
+        }
+
+        form {
+          padding: 18px;
+        }
+
+        .actions {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .back-link {
+          text-align: center;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <p class="eyebrow">Comments API · PUT</p>
+      <h1>Cập nhật bình luận</h1>
+      <p class="subtitle">Chọn bình luận, chỉnh sửa nội dung hoặc mã bài viết rồi lưu thay đổi.</p>
+
+      <form id="edit-form">
+        <label for="comment-id">Bình luận cần sửa</label>
+        <select id="comment-id" required disabled>
+          <option value="">Đang tải danh sách...</option>
+        </select>
+
+        <label for="post-id">Mã bài viết</label>
+        <input id="post-id" name="postId" required>
+
+        <label for="comment-text">Nội dung bình luận</label>
+        <textarea id="comment-text" name="text" required></textarea>
+
+        <div class="actions">
+          <button id="save" type="submit" disabled>Lưu thay đổi</button>
+          <a class="back-link" href="index.html">Quay lại danh sách</a>
+        </div>
+      </form>
+      <p id="status" role="status" aria-live="polite">Đang tải danh sách bình luận...</p>
+    </main>
+
+    <script>
+      const commentsUrl = "http://127.0.0.1:3000/comments";
+      const headers = {
+        Authorization: "Bearer 123",
+        Accept: "application/json"
+      };
+      const commentSelect = document.querySelector("#comment-id");
+      const postIdInput = document.querySelector("#post-id");
+      const commentTextInput = document.querySelector("#comment-text");
+      const form = document.querySelector("#edit-form");
+      const saveButton = document.querySelector("#save");
+      const statusMessage = document.querySelector("#status");
+      let comments = [];
+
+      function showStatus(message, type = "") {
+        statusMessage.textContent = message;
+        statusMessage.className = type;
+      }
+
+      function selectComment() {
+        const comment = comments.find((item) => String(item.id) === commentSelect.value);
+        if (!comment) {
+          return;
+        }
+
+        postIdInput.value = comment.postId ?? "";
+        commentTextInput.value = comment.text ?? "";
+      }
+
+      async function loadComments() {
+        try {
+          const response = await fetch(commentsUrl, {
+            method: "GET",
+            headers
+          });
+
+          if (!response.ok) {
+            throw new Error(`Không tải được bình luận (HTTP ${response.status}).`);
+          }
+
+          const data = await response.json();
+          if (!Array.isArray(data)) {
+            throw new Error("Dữ liệu trả về không đúng định dạng danh sách.");
+          }
+
+          comments = data;
+          commentSelect.replaceChildren();
+          for (const comment of comments) {
+            const option = document.createElement("option");
+            option.value = String(comment.id);
+            option.textContent = `Bình luận #${comment.id}: ${comment.text ?? ""}`;
+            commentSelect.append(option);
+          }
+
+          if (comments.length === 0) {
+            commentSelect.add(new Option("Không có bình luận", ""));
+            showStatus("Không có bình luận để cập nhật.");
+            return;
+          }
+
+          commentSelect.disabled = false;
+          saveButton.disabled = false;
+          selectComment();
+          showStatus(`Đã tải ${comments.length} bình luận.`);
+        } catch (error) {
+          showStatus(
+            error instanceof TypeError
+              ? "Không thể kết nối API. Hãy kiểm tra máy chủ và cấu hình CORS."
+              : error.message,
+            "error"
+          );
+        }
+      }
+
+      commentSelect.addEventListener("change", selectComment);
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const commentId = commentSelect.value;
+        const currentComment = comments.find((item) => String(item.id) === commentId);
+        if (!currentComment) {
+          showStatus("Vui lòng chọn bình luận cần cập nhật.", "error");
+          return;
+        }
+
+        saveButton.disabled = true;
+        showStatus("Đang lưu thay đổi...");
+
+        try {
+          const response = await fetch(`${commentsUrl}/${encodeURIComponent(commentId)}`, {
+            method: "PUT",
+            headers: {
+              ...headers,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              id: currentComment.id,
+              postId: postIdInput.value.trim(),
+              text: commentTextInput.value.trim()
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`Không cập nhật được bình luận (HTTP ${response.status}).`);
+          }
+
+          const updatedComment = await response.json();
+          comments = comments.map((comment) =>
+            String(comment.id) === commentId ? updatedComment : comment
+          );
+          const selectedOption = commentSelect.selectedOptions[0];
+          selectedOption.textContent = `Bình luận #${updatedComment.id}: ${updatedComment.text ?? ""}`;
+          selectComment();
+          showStatus("Cập nhật bình luận thành công.", "success");
+        } catch (error) {
+          showStatus(
+            error instanceof TypeError
+              ? "Không thể kết nối API. Hãy kiểm tra máy chủ và cấu hình CORS."
+              : error.message,
+            "error"
+          );
+        } finally {
+          saveButton.disabled = false;
+        }
+      });
+
+      loadComments();
+    </script>
+  </body>
+</html>

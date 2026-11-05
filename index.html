@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f4f7fb">
+    <title>Danh sách bình luận</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, "Segoe UI", Arial, sans-serif;
+        color: #172033;
+        background: #f4f7fb;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        min-width: 320px;
+        min-height: 100vh;
+        margin: 0;
+        padding: 48px 20px;
+      }
+
+      main {
+        width: min(100%, 760px);
+        margin: 0 auto;
+      }
+
+      .heading {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 20px;
+        margin-bottom: 24px;
+      }
+
+      .eyebrow {
+        margin: 0 0 8px;
+        color: #5369d8;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(1.8rem, 5vw, 2.4rem);
+        letter-spacing: -0.04em;
+      }
+
+      .subtitle {
+        margin: 9px 0 0;
+        color: #65708a;
+      }
+
+      button {
+        flex: 0 0 auto;
+        padding: 10px 16px;
+        border: 0;
+        border-radius: 10px;
+        background: #5369d8;
+        color: #fff;
+        font: inherit;
+        font-weight: 650;
+        cursor: pointer;
+      }
+
+      button:hover {
+        background: #4055c2;
+      }
+
+      button:disabled {
+        cursor: wait;
+        opacity: 0.65;
+      }
+
+      .put-link {
+        flex: 0 0 auto;
+        padding: 10px 16px;
+        border: 1px solid #d8deeb;
+        border-radius: 10px;
+        background: #fff;
+        color: #4055c2;
+        font-weight: 650;
+        text-decoration: none;
+      }
+
+      #status {
+        min-height: 24px;
+        margin: 0 0 12px;
+        color: #65708a;
+      }
+
+      #status.error {
+        color: #b42318;
+      }
+
+      #comments {
+        display: grid;
+        gap: 14px;
+      }
+
+      .comment {
+        padding: 20px;
+        border: 1px solid #e5eaf2;
+        border-radius: 14px;
+        background: #fff;
+        box-shadow: 0 5px 18px rgb(28 42 75 / 5%);
+      }
+
+      .comment-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .comment-title {
+        margin: 0;
+        font-size: 1rem;
+      }
+
+      .post-badge {
+        padding: 5px 9px;
+        border-radius: 999px;
+        background: #eef1ff;
+        color: #4055c2;
+        font-size: 0.78rem;
+        font-weight: 650;
+        white-space: nowrap;
+      }
+
+      .comment-text {
+        margin: 0;
+        color: #46516a;
+        line-height: 1.6;
+        overflow-wrap: anywhere;
+      }
+
+      .empty {
+        padding: 24px;
+        border: 1px dashed #cbd3e1;
+        border-radius: 14px;
+        color: #65708a;
+        text-align: center;
+      }
+
+      @media (max-width: 520px) {
+        body {
+          padding: 32px 16px;
+        }
+
+        .heading {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <header class="heading">
+        <div>
+          <p class="eyebrow">Comments API</p>
+          <h1>Danh sách bình luận</h1>
+          <p class="subtitle">Dữ liệu được tải trực tiếp từ máy chủ.</p>
+        </div>
+        <nav aria-label="Thao tác bình luận">
+          <a class="put-link" href="put.html">Cập nhật bình luận</a>
+          <button id="reload" type="button">Tải lại</button>
+        </nav>
+      </header>
+
+      <p id="status" role="status" aria-live="polite">Đang tải bình luận...</p>
+      <section id="comments" aria-label="Các bình luận"></section>
+    </main>
+
+    <script>
+      const commentsContainer = document.querySelector("#comments");
+      const statusMessage = document.querySelector("#status");
+      const reloadButton = document.querySelector("#reload");
+
+      async function loadComments() {
+        statusMessage.textContent = "Đang tải bình luận...";
+        statusMessage.classList.remove("error");
+        commentsContainer.replaceChildren();
+        reloadButton.disabled = true;
+
+        try {
+          const response = await fetch("http://127.0.0.1:3000/comments", {
+            method: "GET",
+            headers: {
+              Authorization: "Bearer 123",
+              Accept: "application/json"
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error(`Máy chủ trả về lỗi HTTP ${response.status}.`);
+          }
+
+          const comments = await response.json();
+          if (!Array.isArray(comments)) {
+            throw new Error("Dữ liệu trả về không đúng định dạng danh sách.");
+          }
+
+          if (comments.length === 0) {
+            statusMessage.textContent = "Chưa có bình luận nào.";
+            commentsContainer.innerHTML = '<p class="empty">Không có dữ liệu để hiển thị.</p>';
+            return;
+          }
+
+          const fragment = document.createDocumentFragment();
+          for (const comment of comments) {
+            const card = document.createElement("article");
+            card.className = "comment";
+
+            const header = document.createElement("div");
+            header.className = "comment-header";
+
+            const title = document.createElement("h2");
+            title.className = "comment-title";
+            title.textContent = `Bình luận #${comment.id ?? "—"}`;
+
+            const post = document.createElement("span");
+            post.className = "post-badge";
+            post.textContent = `Bài viết #${comment.postId ?? "—"}`;
+
+            const text = document.createElement("p");
+            text.className = "comment-text";
+            text.textContent = comment.text ?? "";
+
+            header.append(title, post);
+            card.append(header, text);
+            fragment.append(card);
+          }
+
+          commentsContainer.append(fragment);
+          statusMessage.textContent = `Đã tải ${comments.length} bình luận.`;
+        } catch (error) {
+          statusMessage.textContent = error instanceof TypeError
+            ? "Không thể kết nối API. Hãy kiểm tra máy chủ và cấu hình CORS."
+            : error.message;
+          statusMessage.classList.add("error");
+        } finally {
+          reloadButton.disabled = false;
+        }
+      }
+
+      reloadButton.addEventListener("click", loadComments);
+      loadComments();
+    </script>
+  </body>
+</html>
